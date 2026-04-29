@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gerador de Orçamentos - Leandro</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <style>
+        body { font-family: 'Segoe UI', Arial, sans-serif; background: #eef2f7; padding: 15px; margin: 0; }
+        .container { max-width: 900px; margin: auto; background: white; padding: 20px; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
+        .input-group { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px; border-bottom: 1px solid #ddd; padding-bottom: 15px; }
+        .input-box { flex: 1; min-width: 250px; }
+        input, textarea { width: 100%; padding: 10px; margin: 5px 0; border: 1px solid #ccc; border-radius: 6px; box-sizing: border-box; font-size: 14px; }
+        h3 { color: #2c3e50; border-left: 4px solid #007bff; padding-left: 10px; margin-top: 20px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 5px; background: #fff; }
+        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+        th { background: #f8f9fa; font-size: 13px; }
+        .btn { border: none; padding: 12px; cursor: pointer; border-radius: 6px; font-weight: bold; transition: 0.3s; }
+        .btn-add { background: #28a745; color: white; margin-top: 10px; }
+        .btn-remove { background: #dc3545; color: white; padding: 5px 10px; }
+        .btn-pdf { background: #007bff; color: white; width: 100%; font-size: 18px; margin-top: 30px; height: 50px; }
+        .btn:hover { opacity: 0.8; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2 style="text-align: center; color: #007bff;">Gerador de Orçamento</h2>
+    
+    <div class="input-group">
+        <div class="input-box">
+            <h3>Meus Dados (Emitente)</h3>
+            <input type="text" id="emit_nome" value="LEANDRO ARAUJO ESCAFURA">
+            <input type="text" id="emit_cnpj" value="63769965000163">
+            <input type="text" id="emit_end" value="Rua Condor - Serra Dourada III, Serra/ES">
+        </div>
+        <div class="input-box">
+            <h3>Dados do Cliente</h3>
+            <input type="text" id="cli_nome" placeholder="Nome do Cliente (ex: ROSA BIANCA)">
+            <input type="text" id="cli_end" placeholder="Endereço Completo">
+            <input type="text" id="num_orc" placeholder="Nº Orçamento (Opcional)">
+        </div>
+    </div>
+
+    <h3>Serviços</h3>
+    <table id="tabelaServicos">
+        <thead><tr><th>Descrição</th><th>Qtd</th><th>Unit (R$)</th><th>Total</th><th>Ação</th></tr></thead>
+        <tbody></tbody>
+    </table>
+    <button class="btn btn-add" onclick="addLinha('tabelaServicos')">+ Adicionar Serviço</button>
+
+    <h3>Produtos</h3>
+    <table id="tabelaProdutos">
+        <thead><tr><th>Descrição</th><th>Qtd</th><th>Unit (R$)</th><th>Total</th><th>Ação</th></tr></thead>
+        <tbody></tbody>
+    </table>
+    <button class="btn btn-add" onclick="addLinha('tabelaProdutos')">+ Adicionar Produto</button>
+
+    <button class="btn btn-pdf" onclick="gerarPDF()">Gerar Orçamento em PDF</button>
+</div>
+
+<script>
+    function addLinha(idTabela) {
+        const tbody = document.getElementById(idTabela).querySelector('tbody');
+        const novaLinha = document.createElement('tr');
+        novaLinha.innerHTML = `
+            <td><input type="text" class="item-nome"></td>
+            <td><input type="number" class="item-qtd" value="1" oninput="recalc(this)"></td>
+            <td><input type="number" class="item-valor" value="0" oninput="recalc(this)"></td>
+            <td class="item-total">R$ 0,00</td>
+            <td><button class="btn btn-remove" onclick="this.parentElement.parentElement.remove()">X</button></td>
+        `;
+        tbody.appendChild(novaLinha);
+    }
+
+    function recalc(el) {
+        const tr = el.parentElement.parentElement;
+        const qtd = tr.querySelector('.item-qtd').value;
+        const valor = tr.querySelector('.item-valor').value;
+        tr.querySelector('.item-total').innerText = "R$ " + (qtd * valor).toFixed(2);
+    }
+
+    function gerarPDF() {
+        const cliNome = document.getElementById('cli_nome').value || "Cliente";
+        const numOrc = document.getElementById('num_orc').value;
+        const dataAtual = new Date().toLocaleDateString('pt-BR');
+
+        let totalServ = 0;
+        let totalProd = 0;
+
+        function extrairItens(idTabela) {
+            let html = "";
+            document.querySelectorAll(`#${idTabela} tbody tr`).forEach(tr => {
+                const nome = tr.querySelector('.item-nome').value;
+                const qtd = parseFloat(tr.querySelector('.item-qtd').value);
+                const valor = parseFloat(tr.querySelector('.item-valor').value);
+                const sub = qtd * valor;
+                if(idTabela === 'tabelaServicos') totalServ += sub; else totalProd += sub;
+                html += `<tr><td>${nome}</td><td>${qtd}</td><td>un</td><td>R$ ${valor.toFixed(2)}</td><td>R$ ${sub.toFixed(2)}</td></tr>`;
+            });
+            return html;
+        }
+
+        const htmlServ = extrairItens('tabelaServicos');
+        const htmlProd = extrairItens('tabelaProdutos');
+
+        const layout = `
+            <div style="font-family: Arial; padding: 40px; color: #333; line-height: 1.4;">
+                <div style="border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px;">
+                    <h2 style="margin:0; text-transform: uppercase;">${document.getElementById('emit_nome').value}</h2>
+                    <p style="margin:2px">${document.getElementById('emit_cnpj').value}</p>
+                    <p style="margin:2px">${document.getElementById('emit_end').value}</p>
+                </div>
+                <div style="margin-bottom: 20px;">
+                    <div style="background: #f2f2f2; padding: 5px; font-weight: bold; border: 1px solid #000;">Dados do Cliente</div>
+                    <div style="padding: 10px; border: 1px solid #000; border-top: none;">
+                        <strong>${cliNome}</strong><br>${document.getElementById('cli_end').value}
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 style="margin: 0;">Serviços</h3>
+                    <span>${numOrc ? '<strong>ORÇAMENTO N° ' + numOrc + '</strong>' : ''}</span>
+                </div>
+                <table style="width:100%; border-collapse:collapse; margin-top:5px;" border="1">
+                    <tr style="background:#eee"><th>Nome</th><th>Qtd</th><th>Un</th><th>V. Unit</th><th>Total</th></tr>
+                    ${htmlServ}
+                    <tr><td colspan="4" align="right"><strong>Total Serviços</strong></td><td><strong>R$ ${totalServ.toFixed(2)}</strong></td></tr>
+                </table>
+                <h3 style="margin-top: 20px;">Produtos</h3>
+                <table style="width:100%; border-collapse:collapse; margin-top:5px;" border="1">
+                    <tr style="background:#eee"><th>Nome</th><th>Qtd</th><th>Un</th><th>V. Unit</th><th>Total</th></tr>
+                    ${htmlProd}
+                </table>
+                <div style="margin-top: 20px; text-align: right; border: 1px solid #000; padding: 10px;">
+                    <p style="margin: 2px;">Total Produtos: R$ ${totalProd.toFixed(2)}</p>
+                    <p style="margin: 2px;">Subtotal: R$ ${(totalServ + totalProd).toFixed(2)}</p>
+                    <p style="font-size: 18px; margin: 2px;"><strong>Total Orçamento: R$ ${(totalServ + totalProd).toFixed(2)}</strong></p>
+                </div>
+                <div style="margin-top: 20px; font-size: 11px;">
+                    <strong>Observações:</strong><br>
+                    Formas de Pagamento: Dinheiro, Transferência Bancária, Pix<br>
+                    Garantia de serviço: 3 Meses | Garantia de equipamento: 12 meses<br>
+                    <strong>Data: ${dataAtual}</strong>
+                </div>
+            </div>
+        `;
+
+        const opt = { 
+            margin: 0, 
+            filename: `Orcamento_${cliNome}.pdf`, 
+            html2canvas: { scale: 2 }, 
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } 
+        };
+        html2pdf().from(layout).set(opt).save();
+    }
+</script>
+</body>
+</html>
